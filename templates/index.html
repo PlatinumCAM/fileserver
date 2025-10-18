@@ -1,0 +1,315 @@
+<!doctype html>
+<html lang="fr">
+<head>
+    <meta charset="utf-8">
+    <title>Index — {{ rel_path or '/' }}</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <style>
+        :root {
+          --bg-color: #fafafa;
+          --text-color: #222;
+          --card-bg: #ffffff;
+          --shadow: rgba(0,0,0,0.1);
+          --border-color: #ddd;
+          --button-bg: #f0f0f0;
+          --button-text: #222;
+        }
+        body.dark {
+          --bg-color: #121212;
+          --text-color: #e0e0e0;
+          --card-bg: #1f1f1f;
+          --shadow: rgba(255,255,255,0.1);
+          --border-color: #333;
+          --button-bg: #2a2a2a;
+          --button-text: #fff;
+        }
+
+        body {
+          font-family: system-ui, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+          margin: 24px;
+          background-color: var(--bg-color);
+          color: var(--text-color);
+          display: flex;
+          flex-direction: row;
+          justify-content: center;
+          align-items: flex-start;
+        }
+
+        #content {
+          flex: 1;
+          max-width: 900px;
+          margin-right: 340px; /* espace lecteur fixe */
+        }
+
+        h1 {
+          font-size: 20px;
+          margin-bottom: 10px;
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+        }
+
+        table {
+          border-collapse: collapse;
+          width: 100%;
+          background-color: var(--card-bg);
+          border-radius: 8px;
+          box-shadow: 0 2px 6px var(--shadow);
+          overflow: hidden;
+        }
+
+        td, th {
+          padding: 10px;
+          border-bottom: 1px solid var(--border-color);
+          text-align: left;
+        }
+
+        a {
+          color: #1a73e8;
+          text-decoration: none;
+          cursor: pointer;
+        }
+        a:hover {
+          text-decoration: underline;
+        }
+
+        .meta { color: #888; font-size: 0.9em; }
+        .actions { white-space: nowrap; }
+
+        /* Lecteur fixe */
+        #player-container {
+          position: fixed;
+          top: 20px;
+          right: 20px;
+          width: 320px;
+          display: none;
+          flex-direction: column;
+          align-items: center;
+          background-color: var(--card-bg);
+          border-radius: 12px;
+          box-shadow: 0 2px 8px var(--shadow);
+          padding: 16px;
+          z-index: 100;
+        }
+
+        #cover {
+          width: 100%;
+          height: auto;
+          border-radius: 10px;
+          object-fit: cover;
+          box-shadow: 0 1px 4px var(--shadow);
+          margin-bottom: 8px;
+        }
+
+        #song-title {
+          font-size: 16px;
+          font-weight: 600;
+          text-align: center;
+          margin-bottom: 4px;
+        }
+
+        #album-name {
+          font-size: 14px;
+          color: #666;
+          margin-bottom: 8px;
+          text-align: center;
+        }
+
+        #audio-player { width: 100%; margin-bottom: 10px; }
+
+        .player-btn {
+          background-color: var(--button-bg);
+          color: var(--button-text);
+          border: 1px solid var(--border-color);
+          border-radius: 6px;
+          padding: 6px 10px;
+          margin: 4px;
+          cursor: pointer;
+          transition: background 0.2s, color 0.2s;
+        }
+        .player-btn:hover { background-color: var(--border-color); }
+        #auto-btn.active { background-color: #dff0d8; border-color: #9dc79d; color: #222; }
+
+        #theme-btn {
+          background-color: var(--button-bg);
+          color: var(--button-text);
+          border: 1px solid var(--border-color);
+          border-radius: 6px;
+          padding: 6px 12px;
+          cursor: pointer;
+          font-size: 14px;
+          transition: background 0.2s, color 0.2s;
+        }
+        #theme-btn:hover { background-color: var(--border-color); }
+    </style>
+</head>
+<body>
+<div id="content">
+    <h1>
+        Contenu de : {{ rel_path or '/' }}
+        <button id="theme-btn" onclick="toggleTheme()">Mode sombre</button>
+    </h1>
+
+    <table>
+        <thead>
+        <tr>
+            <th>Nom</th>
+            <th>Type</th>
+            <th>Taille</th>
+            <th>Actions</th>
+        </tr>
+        </thead>
+        <tbody id="file-list">
+        {% if parent_link %}
+        <tr>
+            <td><a href="{{ parent_link }}">.. (Parent)</a></td>
+            <td>Répertoire</td>
+            <td></td>
+            <td></td>
+        </tr>
+        {% endif %}
+        {% for d in dirs %}
+        <tr>
+            <td><a href="{{ d.link }}">{{ d.name }}/</a></td>
+            <td>Répertoire</td>
+            <td class="meta">{{ d.count }} éléments</td>
+            <td class="actions"><a href="{{ d.zip_link }}">Télécharger .zip</a></td>
+        </tr>
+        {% endfor %}
+        {% for f in files %}
+        <tr class="file-row" data-mp3="{{ '1' if f.is_mp3 else '0' }}"
+            data-src="{{ f.stream_link }}" data-cover="{{ f.cover_link }}"
+            data-name="{{ f.name }}" data-album="{{ f.album }}">
+            <td>
+                {% if f.is_mp3 %}
+                <a onclick="playAudio('{{ f.stream_link }}','{{ f.cover_link }}','{{ f.name }}','{{ f.album }}')">{{
+                    f.name }}</a>
+                {% else %}
+                <a href="{{ f.link }}">{{ f.name }}</a>
+                {% endif %}
+            </td>
+            <td>{{ 'Fichier audio' if f.is_mp3 else 'Fichier' }}</td>
+            <td class="meta">{{ f.size }}</td>
+            <td class="actions"><a href="{{ f.dl_link }}">Télécharger</a></td>
+        </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<div id="player-container">
+    <img id="cover" src="" alt="Pochette">
+    <div id="song-title"></div>
+    <div id="album-name"></div>
+    <audio id="audio-player" controls autoplay></audio>
+    <div>
+        <button class="player-btn" onclick="prevTrack()">⏮ Précédent</button>
+        <button class="player-btn" onclick="nextTrack()">⏭ Suivant</button>
+    </div>
+    <div>
+        <button class="player-btn" id="shuffle-btn" onclick="toggleShuffle()">🔀 Normal</button>
+        <button class="player-btn" id="loop-btn" onclick="toggleLoop()">🔁 Non</button>
+    </div>
+    <button id="auto-btn" class="player-btn active" onclick="toggleAutoPlay()">Lecture auto : ON</button>
+</div>
+
+<script>
+    let playlist = [];
+    let currentIndex = -1;
+    let autoPlay = true;
+    let shuffle = false;
+
+    const playerContainer = document.getElementById('player-container');
+    const player = document.getElementById('audio-player');
+    const coverImg = document.getElementById('cover');
+    const songTitle = document.getElementById('song-title');
+    const albumName = document.getElementById('album-name');
+    const autoBtn = document.getElementById('auto-btn');
+    const themeBtn = document.getElementById('theme-btn');
+    const shuffleBtn = document.getElementById('shuffle-btn');
+    const loopBtn = document.getElementById('loop-btn');
+
+    // Volume
+    const savedVolume = localStorage.getItem('preferredVolume');
+    player.volume = savedVolume ? parseFloat(savedVolume) : 0.5;
+    player.addEventListener('volumechange', () => {
+      localStorage.setItem('preferredVolume', player.volume.toString());
+    });
+
+    // Thème
+    const savedTheme = localStorage.getItem('theme') || 'light';
+    if (savedTheme === 'dark') {
+      document.body.classList.add('dark');
+      themeBtn.textContent = 'Mode clair';
+    }
+
+    function toggleTheme() {
+      const dark = document.body.classList.toggle('dark');
+      localStorage.setItem('theme', dark ? 'dark' : 'light');
+      themeBtn.textContent = dark ? 'Mode clair' : 'Mode sombre';
+    }
+
+    // Playlist
+    document.querySelectorAll('.file-row').forEach(row => {
+      if(row.dataset.mp3 === "1") {
+        playlist.push({
+          src: row.dataset.src,
+          cover: row.dataset.cover,
+          name: row.dataset.name,
+          album: row.dataset.album
+        });
+      }
+    });
+
+    function playAudio(src, cover, title, album) {
+        currentIndex = playlist.findIndex(f => f.src === src);
+        player.src = src;
+        player.loop = false;
+        loopBtn.textContent = "🔁 Non";
+        songTitle.textContent = title;  // déjà sans extension
+        albumName.textContent = album || "";
+        coverImg.src = cover;
+        playerContainer.style.display = 'flex';
+        player.play().catch(() => {});
+        }
+    function nextTrack() {
+      if (playlist.length === 0) return;
+      let nextIndex;
+      if(shuffle) {
+        nextIndex = Math.floor(Math.random() * playlist.length);
+      } else {
+        nextIndex = (currentIndex + 1) % playlist.length;
+      }
+      const next = playlist[nextIndex];
+      playAudio(next.src, next.cover, next.name, next.album);
+    }
+
+    function prevTrack() {
+      if (playlist.length === 0) return;
+      const prevIndex = (currentIndex - 1 + playlist.length) % playlist.length;
+      const prev = playlist[prevIndex];
+      playAudio(prev.src, prev.cover, prev.name, prev.album);
+    }
+
+    function playNext() { if(autoPlay) nextTrack(); }
+
+    function toggleAutoPlay() {
+      autoPlay = !autoPlay;
+      autoBtn.classList.toggle('active', autoPlay);
+      autoBtn.textContent = "Lecture auto : " + (autoPlay ? "ON" : "OFF");
+    }
+
+    function toggleShuffle() {
+      shuffle = !shuffle;
+      shuffleBtn.textContent = shuffle ? "🔀 Aléatoire" : "🔀 Normal";
+    }
+
+    function toggleLoop() {
+      player.loop = !player.loop;
+      loopBtn.textContent = player.loop ? "🔁 Oui" : "🔁 Non";
+    }
+
+    player.addEventListener('ended', playNext);
+</script>
+</body>
+</html>

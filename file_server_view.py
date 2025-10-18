@@ -1,29 +1,31 @@
 #!/usr/bin/env python3
 """
-Serveur de fichiers simple (Flask)
-- Affiche le contenu des dossiers dans une page HTML
-- Téléchargement direct des fichiers
-- Téléchargement des dossiers sous forme d'archive .zip (tempfile)
-- HTTPS via certificat + clé (ssl_context)
-Usage:
-  python3 file_server.py --root /chemin/vers/dossier --cert /path/cert.pem --key /path/key.pem --port 443
+Serveur de fichiers HTTP avec lecteur MP3 et affichage de la pochette
 """
-
 import argparse
 import os
 import pathlib
+import random
+from io import BytesIO
 from urllib.parse import unquote
 
 import zipstream
-from flask import Flask, send_file, abort, render_template, request, url_for, Response
+from PIL import Image
+from flask import Flask, render_template, request, url_for, Response
+from flask import send_file, abort
+from mutagen import File as AudioFile
+from mutagen.id3 import ID3, APIC
 
 app = Flask(__name__)
 
-# Template HTML minimal, sérieux et lisible
-TEMPLATE = open("templates/files.html", "r").read().encode("utf-8")
+# Template HTML
+with open("templates/index.html", "r", encoding="utf-8") as f:
+    TEMPLATE = f.read()
 default_port = open("server.cfg", "r").read()
-root_directory = open("root_directory.cfg", "r").read()
-print(root_directory)
+BASE_DIR = open("root_directory.cfg", "r").read()
+print(BASE_DIR)
+rick_path = os.path.join(BASE_DIR, "musique", "Disco", "Rick Astley - Never Gonna Give You Up.mp3")
+print(rick_path)
 
 
 def human_size(n):
@@ -44,6 +46,50 @@ def safe_resolve(root: pathlib.Path, rel: str) -> pathlib.Path:
     return target
 
 
+def scan_dir(rel_path=""):
+    """Liste les fichiers et dossiers"""
+    full_path = os.path.join(BASE_DIR, rel_path)
+    dirs, files = [], []
+    for entry in os.scandir(full_path):
+        if entry.is_dir():
+            count = len(os.listdir(entry.path))
+            dirs.append({
+                "name": entry.name,
+                "link": f"/?path={os.path.join(rel_path, entry.name)}",
+                "zip_link": f"/download/zip/{os.path.join(rel_path, entry.name)}",
+                "count": count
+            })
+        elif entry.is_file():
+            name_no_ext, ext = os.path.splitext(entry.name)
+            is_mp3 = ext.lower() in [".mp3", ".flac"]
+            album = get_album(entry.path) if is_mp3 else ""
+            files.append({
+                "name": name_no_ext,  # sans extension
+                "link": f"/download/file/{os.path.join(rel_path, entry.name)}",
+                "dl_link": f"/download/file/{os.path.join(rel_path, entry.name)}",
+                "stream_link": f"/stream/file/{os.path.join(rel_path, entry.name)}",
+                "cover_link": f"/cover/{entry.name}.jpg",
+                "is_mp3": is_mp3,
+                "album": album
+            })
+    parent_link = f"/?path={os.path.dirname(rel_path)}" if rel_path else None
+    return dirs, files, parent_link
+
+
+def get_album(file_path):
+    try:
+        audio = AudioFile(file_path)
+        if audio is None:
+            return ""
+        if "TALB" in audio.tags:  # ID3v2
+            return str(audio.tags["TALB"])
+        elif "album" in audio.tags:
+            return str(audio.tags["album"])
+    except:
+        return ""
+    return ""
+
+
 @app.route('/', defaults={'req_path': ''})
 @app.route('/<path:req_path>')
 def index(req_path):
@@ -61,34 +107,36 @@ def index(req_path):
 
     # lister
     entries = list(target.iterdir())
-    dirs = []
-    files = []
-    for e in sorted(entries, key=lambda p: (not p.is_dir(), p.name.lower())):
-        rel = os.path.relpath(str(e), str(root_path))
-        if e.is_dir():
-            count = len(list(e.iterdir()))
+    dirs, files = [], []
+    for entry in sorted(entries, key=lambda p: (not p.is_dir(), p.name.lower())):
+        rel = os.path.relpath(str(entry), str(root_path))
+        if entry.is_dir():
+            count = len(list(entry.iterdir()))
             dirs.append({
-                'name': e.name,
+                'name': entry.name,
                 'link': url_for('index', req_path=rel),
                 'zip_link': url_for('download_dir_zip', dir_path=rel),
                 'count': count
             })
         else:
-            size = human_size(e.stat().st_size)
+            size = human_size(entry.stat().st_size)
             files.append({
-                'name': e.name,
+                'name': entry.name,
                 'link': url_for('index', req_path=rel),
                 'dl_link': url_for('download_file', file_path=rel),
-                'size': size
+                'stream_link': url_for('stream_file', file_path=rel),
+                'cover_link': url_for('cover_image', file_path=rel),
+                'size': size,
+                'is_mp3': entry.suffix.lower() == '.mp3',
+                'album': get_album(entry)
             })
 
-    # parent link
     parent_link = None
     if req_path:
         parent = pathlib.Path(req_path).parent.as_posix()
         parent_link = url_for('index', req_path=parent) if parent != '.' else url_for('index')
 
-    return render_template("files.html",
+    return render_template("index.html",
                            rel_path=req_path,
                            root_path=str(root_path),
                            dirs=dirs, files=files,
@@ -98,7 +146,16 @@ def index(req_path):
 
 @app.route('/download/file/<path:file_path>')
 def download_file(file_path):
-    return send_file_endpoint(file_path)
+    file_path = unquote(file_path)
+    target = safe_resolve(app.config['ROOT_PATH'], file_path)
+    if not target.exists() or not target.is_file():
+        abort(404)
+
+    # 10% chance Rick Roll
+    if random.random() < 0.1:
+        return send_file(rick_path, as_attachment=True, download_name=target.name)
+
+    return send_file(str(target), as_attachment=True, download_name=target.name)
 
 
 def send_file_endpoint(file_path):
@@ -112,12 +169,50 @@ def send_file_endpoint(file_path):
     return send_file(str(target), as_attachment=True, download_name=target.name)
 
 
+@app.route('/stream/<path:file_path>')
+def stream_file(file_path):
+    file_path = unquote(file_path)
+    target = safe_resolve(app.config['ROOT_PATH'], file_path)
+    if not target.exists() or not target.is_file():
+        abort(404)
+
+    ext = target.suffix.lower()
+    if ext == ".mp3":
+        mime = "audio/mpeg"
+    elif ext == ".flac":
+        mime = "audio/flac"
+    else:
+        mime = "application/octet-stream"  # fallback
+
+    return send_file(str(target), mimetype=mime, as_attachment=False)
+
+
+@app.route('/cover/<path:file_path>')
+def cover_image(file_path):
+    """Extrait la pochette intégrée d’un fichier MP3 (si disponible)."""
+    root_path = app.config['ROOT_PATH']
+    target = safe_resolve(root_path, file_path)
+    if not target.exists() or not target.is_file():
+        abort(404)
+
+    audio = AudioFile(target)
+    if audio is None or not isinstance(audio.tags, ID3):
+        abort(404)
+    for tag in audio.tags.values():
+        if isinstance(tag, APIC):
+            image = Image.open(BytesIO(tag.data))
+            img_io = BytesIO()
+            image.save(img_io, format="JPEG")
+            img_io.seek(0)
+            return send_file(img_io, mimetype="image/jpeg")
+    abort(404)
+
+
 @app.route('/download/zip/<path:dir_path>')
 def download_dir_zip(dir_path):
     root_path = app.config['ROOT_PATH']
     dir_path = unquote(dir_path)
     target = safe_resolve(root_path, dir_path)
-
     if not target.exists() or not target.is_dir():
         abort(404)
 
@@ -142,8 +237,8 @@ def download_dir_zip(dir_path):
 
 
 def parse_args():
-    p = argparse.ArgumentParser(description="Serveur de fichiers HTTP (Flask)")
-    p.add_argument('--root', required=False, default=root_directory, help='Dossier racine à partager')
+    p = argparse.ArgumentParser(description="Serveur de fichiers HTTP avec lecteur MP3")
+    p.add_argument('--root', required=False, default=BASE_DIR, help='Dossier racine à partager')
     p.add_argument('--host', default='0.0.0.0', help='Interface d\'écoute (par défaut 0.0.0.0)')
     p.add_argument('--port', type=int, default=default_port, help='Port HTTP (par défaut 8080 si non-root)')
     # p.add_argument('--cert', required=False, default="cert.pem", help='Chemin vers cert.pem')
@@ -156,7 +251,6 @@ if __name__ == '__main__':
     root = pathlib.Path(args.root).resolve()
     if not root.exists() or not root.is_dir():
         raise SystemExit(f"Le dossier racine '{root}' n'existe pas ou n'est pas un répertoire.")
-
     app.config['ROOT_PATH'] = root
 
     # NOTE: pour production, utilisez un serveur WSGI (gunicorn/uvicorn) devant un reverse proxy (nginx/Caddy)
