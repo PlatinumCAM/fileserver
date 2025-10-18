@@ -182,7 +182,7 @@
             data-name={{ f.name|tojson }} data-album={{ f.album|tojson }}>
             <td>
                 {% if f.is_mp3 %}
-                <a onclick='playAudio({{ f.stream_link|tojson }}, {{ f.cover_link|tojson }}, {{ f.name|tojson }}, {{ f.album|tojson }})'>
+                <a onclick='playAudio({{ f.stream_link|tojson }}, {{ f.cover_link|tojson }}, {{ f.name|replace(".mp3","")|replace(".flac","")|tojson }}, {{ f.album|tojson }})'>
                     {{ f.name }}
                 </a>
                 {% else %}
