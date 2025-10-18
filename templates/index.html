@@ -178,8 +178,8 @@
         {% endfor %}
         {% for f in files %}
         <tr class="file-row" data-mp3="{{ '1' if f.is_mp3 else '0' }}"
-            data-src="{{ f.stream_link }}" data-cover="{{ f.cover_link }}"
-            data-name="{{ f.name }}" data-album="{{ f.album }}">
+            data-src="{{ f.stream_link|tojson }}" data-cover="{{ f.cover_link|tojson }}"
+            data-name="{{ f.name|tojson }}" data-album="{{ f.album|tojson }}">
             <td>
                 {% if f.is_mp3 %}
                 <a onclick="playAudio('{{ f.stream_link }}','{{ f.cover_link }}','{{ f.name }}','{{ f.album }}')">{{
