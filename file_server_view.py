@@ -13,7 +13,7 @@ import zipstream
 from PIL import Image
 from flask import Flask, render_template, request, url_for, Response
 from flask import send_file, abort
-from mutagen import File as AudioFile
+from mutagen import File as AudioFile, MutagenError
 from mutagen.id3 import ID3, APIC
 
 app = Flask(__name__)
@@ -41,7 +41,8 @@ def safe_resolve(root: pathlib.Path, rel: str) -> pathlib.Path:
     target = (root / rel).resolve()
     try:
         target.relative_to(root.resolve())
-    except Exception:
+    except ValueError:
+        # Raised if target is not inside root
         abort(403, "Accès interdit")
     return target
 
@@ -85,7 +86,8 @@ def get_album(file_path):
             return str(audio.tags["TALB"])
         elif "album" in audio.tags:
             return str(audio.tags["album"])
-    except:
+    except (MutagenError, KeyError, AttributeError):
+        # Only catch expected Mutagen-related errors
         return ""
     return ""
 
