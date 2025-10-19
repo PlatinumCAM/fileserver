@@ -198,16 +198,22 @@ def cover_image(file_path):
         abort(404)
 
     audio = AudioFile(target)
-    if audio is None or not isinstance(audio.tags, ID3):
-        abort(404)
-    for tag in audio.tags.values():
-        if isinstance(tag, APIC):
-            image = Image.open(BytesIO(tag.data))
-            img_io = BytesIO()
-            image.save(img_io, format="JPEG")
-            img_io.seek(0)
-            return send_file(img_io, mimetype="image/jpeg")
-    abort(404)
+    if audio is not None and isinstance(audio.tags, ID3):
+        for tag in audio.tags.values():
+            if isinstance(tag, APIC):
+                image = Image.open(BytesIO(tag.data))
+                img_io = BytesIO()
+                image.save(img_io, format="JPEG")
+                img_io.seek(0)
+                return send_file(img_io, mimetype="image/jpeg")
+
+    # Pas de pochette : image grise par défaut
+    size = (200, 200)  # taille du carré
+    image = Image.new('RGB', size, color=(128, 128, 128))  # gris
+    img_io = BytesIO()
+    image.save(img_io, format="JPEG")
+    img_io.seek(0)
+    return send_file(img_io, mimetype="image/jpeg")
 
 
 @app.route('/download/zip/<path:dir_path>')
