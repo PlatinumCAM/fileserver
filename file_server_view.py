@@ -7,6 +7,7 @@ import os
 import pathlib
 import random
 from io import BytesIO
+from pathlib import Path
 from urllib.parse import unquote
 
 import zipstream
@@ -26,6 +27,10 @@ BASE_DIR = open("root_directory.cfg", "r").read()
 print(BASE_DIR)
 rick_path = os.path.join(BASE_DIR, "musique", "Disco", "Rick Astley - Never Gonna Give You Up.mp3")
 print(rick_path)
+import json
+
+with open('background.json', 'r') as file:
+    backgrounds = json.load(file)
 
 
 def human_size(n):
@@ -74,6 +79,7 @@ def scan_dir(rel_path=""):
                 "album": album
             })
     parent_link = f"/?path={os.path.dirname(rel_path)}" if rel_path else None
+    # parent_link = f"/?path={pathlib.Path(rel_path).as_posix()}" if rel_path else None
     return dirs, files, parent_link
 
 
@@ -92,11 +98,39 @@ def get_album(file_path):
     return ""
 
 
+def background(path):
+    """
+    Retourne le chemin de l'image de fond à utiliser pour un dossier donné.
+    """
+    print(path)
+    candidate = None
+    longest_key = ""
+    for key in backgrounds:
+        if key in path:
+            if len(key) > len(longest_key):
+                longest_key = key
+                candidate = (Path("bg") / backgrounds[key]).as_posix()
+                print(candidate)
+    return candidate
+
+
+@app.route('/background')
+def background_image():
+    """Servez bg.jpg depuis le même dossier que le script Flask."""
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    bg_path = os.path.join(script_dir, "bg.jpg")
+    if os.path.exists(bg_path):
+        return send_file(bg_path, mimetype="image/jpeg")
+    abort(404)
+
+
 @app.route('/', defaults={'req_path': ''})
 @app.route('/<path:req_path>')
 def index(req_path):
     # décodage de l'URL
     req_path = unquote(req_path)
+    # 🔧 Normalisation universelle du chemin
+    req_path = pathlib.Path(req_path).as_posix()
     root_path = app.config['ROOT_PATH']
     target = safe_resolve(root_path, req_path)
 
@@ -112,6 +146,7 @@ def index(req_path):
     dirs, files = [], []
     for entry in sorted(entries, key=lambda p: (not p.is_dir(), p.name.lower())):
         rel = os.path.relpath(str(entry), str(root_path))
+        rel = pathlib.Path(rel).as_posix()  # 🔧 uniformisation ici aussi
         if entry.is_dir():
             count = len(list(entry.iterdir()))
             dirs.append({
@@ -137,13 +172,17 @@ def index(req_path):
     if req_path:
         parent = pathlib.Path(req_path).parent.as_posix()
         parent_link = url_for('index', req_path=parent) if parent != '.' else url_for('index')
+    bg_url = url_for('static', filename=f"{background(req_path)}")
 
+    # bg_url = background(req_path)
+    print("url", bg_url)
     return render_template("index.html",
                            rel_path=req_path,
                            root_path=str(root_path),
                            dirs=dirs, files=files,
                            parent_link=parent_link,
-                           request_url=request.url)
+                           request_url=request.url,
+                           bg_url=bg_url)
 
 
 @app.route('/download/file/<path:file_path>')

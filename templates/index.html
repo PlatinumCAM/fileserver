@@ -77,5 +77,22 @@
     <button id="auto-btn" class="player-btn active" onclick="toggleAutoPlay()">Lecture auto : ON</button>
 </div>
 <script src="{{ url_for('static',filename='player.js') }}"></script>
+<style>
+    body {
+       font-family: system-ui, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+       margin: 24px;
+       background-color: var(--bg-color);
+       background-image: url('{{ bg_url }}');
+       background-size: cover;       /* remplit sans déformation */
+       background-repeat: no-repeat; /* pas de répétition */
+       background-position: center;  /* centré */
+       background-attachment: fixed; /* <-- clé : le fond ne bouge plus */
+       color: var(--text-color);
+       display: flex;
+       flex-direction: row;
+       justify-content: center;
+       align-items: flex-start;
+ }
+</style>
 </body>
 </html>
