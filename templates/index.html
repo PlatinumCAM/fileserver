@@ -38,7 +38,7 @@
         #content {
           flex: 1;
           max-width: 900px;
-          margin-right: 340px; /* espace lecteur fixe */
+          margin-right: 360px; /* espace pour lecteur fixe */
         }
 
         h1 {
@@ -93,12 +93,13 @@
         }
 
         #cover {
-          width: 100%;
-          height: auto;
+          width: 300px;
+          height: 300px;
           border-radius: 10px;
           object-fit: cover;
           box-shadow: 0 1px 4px var(--shadow);
-          margin-bottom: 8px;
+          margin-bottom: 12px;
+          flex-shrink: 0;
         }
 
         #song-title {
@@ -106,6 +107,12 @@
           font-weight: 600;
           text-align: center;
           margin-bottom: 4px;
+          display: -webkit-box;
+          -webkit-line-clamp: 2; /* limite à 2 lignes */
+          -webkit-box-orient: vertical;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          height: 3em; /* hauteur fixe pour 2 lignes */
         }
 
         #album-name {
@@ -113,6 +120,10 @@
           color: #666;
           margin-bottom: 8px;
           text-align: center;
+          height: 1.5em; /* hauteur fixe pour éviter chevauchement */
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
         }
 
         #audio-player { width: 100%; margin-bottom: 10px; }
@@ -126,6 +137,7 @@
           margin: 4px;
           cursor: pointer;
           transition: background 0.2s, color 0.2s;
+          flex-shrink: 0;
         }
         .player-btn:hover { background-color: var(--border-color); }
         #auto-btn.active { background-color: #dff0d8; border-color: #9dc79d; color: #222; }
@@ -141,7 +153,15 @@
           transition: background 0.2s, color 0.2s;
         }
         #theme-btn:hover { background-color: var(--border-color); }
+
+        /* boutons dans le lecteur */
+        #player-container > div {
+          display: flex;
+          justify-content: center;
+          flex-wrap: wrap;
+        }
     </style>
+
 </head>
 <body>
 <div id="content">
