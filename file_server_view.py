@@ -3,6 +3,7 @@
 Serveur de fichiers HTTP avec lecteur MP3 et affichage de la pochette
 """
 import argparse
+import json
 import os
 import pathlib
 import random
@@ -23,11 +24,10 @@ app = Flask(__name__)
 with open("templates/index.html", "r", encoding="utf-8") as f:
     TEMPLATE = f.read()
 default_port = open("server.cfg", "r").read()
-BASE_DIR = open("root_directory.cfg", "r").read()
+BASE_DIR = open("root_directory.cfg", "r").read().strip()
 print(BASE_DIR)
 rick_path = os.path.join(BASE_DIR, "musique", "Disco", "Rick Astley - Never Gonna Give You Up.mp3")
 print(rick_path)
-import json
 
 with open('background.json', 'r') as file:
     backgrounds = json.load(file)
@@ -79,7 +79,6 @@ def scan_dir(rel_path=""):
                 "album": album
             })
     parent_link = f"/?path={os.path.dirname(rel_path)}" if rel_path else None
-    # parent_link = f"/?path={pathlib.Path(rel_path).as_posix()}" if rel_path else None
     return dirs, files, parent_link
 
 
@@ -288,8 +287,8 @@ def parse_args():
     p.add_argument('--root', required=False, default=BASE_DIR, help='Dossier racine à partager')
     p.add_argument('--host', default='0.0.0.0', help='Interface d\'écoute (par défaut 0.0.0.0)')
     p.add_argument('--port', type=int, default=default_port, help='Port HTTP (par défaut 8080 si non-root)')
-    # p.add_argument('--cert', required=False, default="cert.pem", help='Chemin vers cert.pem')
-    # p.add_argument('--key', required=False, default="key.pem", help='Chemin vers key.pem')
+    p.add_argument('--cert', required=False, default="cert.pem", help='Chemin vers cert.pem')
+    p.add_argument('--key', required=False, default="key.pem", help='Chemin vers key.pem')
     return p.parse_args()
 
 
@@ -301,6 +300,6 @@ if __name__ == '__main__':
     app.config['ROOT_PATH'] = root
 
     # NOTE: pour production, utilisez un serveur WSGI (gunicorn/uvicorn) devant un reverse proxy (nginx/Caddy)
-    # context = (args.cert, args.key)  # Flask accepte un tuple (cert,key)
+    context = (args.cert, args.key)  # Flask accepte un tuple (cert,key)
     # Avertissement: la fonction run de Flask n'est pas recommandée en production mais suffit pour un service simple.
-    app.run(host=args.host, port=args.port, threaded=True)  # , ssl_context=context)
+    app.run(host=args.host, port=args.port, threaded=True, ssl_context=context)
